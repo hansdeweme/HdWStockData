@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hdw-stock-data"
+dynamic = ["version"]
+description = "Retrieve and normalize Yahoo stock OHLCV observations with timezone-aware timestamps."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{name = "Hans De Weme", email = "hdweme@gmail.com"}]
+dependencies = ["numpy", "pandas", "requests", "tzdata"]
+keywords = ["yahoo", "stocks", "ohlcv", "market-data", "time-series"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+
+[project.optional-dependencies]
+dev = ["build", "twine"]
+
+[project.urls]
+Homepage = "https://github.com/hansdeweme/HdWStockData"
+Repository = "https://github.com/hansdeweme/HdWStockData"
+Issues = "https://github.com/hansdeweme/HdWStockData/issues"
+
+[tool.setuptools.dynamic]
+version = {attr = "hdw_stock_data.version.VERSION"}
+
+[tool.setuptools.packages.find]
+include = ["hdw_stock_data*"]
