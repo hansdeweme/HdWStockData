@@ -17,6 +17,12 @@ optionally writes a snapshot, and returns `StockDataResult`.
 The package does not import the crypto project, chart code, settings files, or
 GUI libraries. Its DataFrame is compatible with the crypto analysis contract.
 
+The optional GUI lives in `examples/`; see [showcase setup](showcase.md) and
+the [showcase architecture diagram](showcase-architecture.png). Documentation
+and examples are included in the source distribution; the wheel contains only
+the core library. Developer utilities live in `tools/`. To export Python
+sources to a new text file, run `python tools/py_sources_to_txt.py OUTPUT`.
+
 Snapshots use sanitized symbols and UTC bounds, for example
 `GSPC-yahoo-1h-20260306T143000Z--20260309T133000Z.csv`. A unique temporary file
 in the destination directory is flushed and replaced atomically. On failure,

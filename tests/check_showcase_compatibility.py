@@ -1,9 +1,9 @@
 """Offline showcase chart smoke test; no GUI windows or network requests.
 
 Run from the project root:
-    py -3.13 examples/check_showcase_compatibility.py
+    py -3.13 -m tests.check_showcase_compatibility
 Use --chart-source PATH to select the directory containing ta_charts.py
-(defaults to this checkout).
+(defaults to this checkout's examples directory).
 """
 
 import argparse
@@ -22,15 +22,16 @@ import pandas as pd
 def main():
     root = Path(__file__).resolve().parents[1]
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--chart-source', type=Path, default=root)
+    parser.add_argument('--chart-source', type=Path, default=root / 'examples')
     args = parser.parse_args()
     sys.path.insert(0, str(root))
-    sys.path.insert(0, str(args.chart_source.resolve()))
+    import examples
+    examples.__path__.insert(0, str(args.chart_source.resolve()))
     os.environ.setdefault('NUMBA_DISABLE_JIT', '1')
-    import showcase_pyqt_app as showcase
+    from examples import showcase_pyqt_app as showcase
     import plotly.io as pio
     from hdw_stock_data.normalizer import normalize_yahoo_chart
-    from showcase_sources import MarketDataset
+    from examples.showcase_sources import MarketDataset
 
     # Hourly stock-session observations, including overnight/weekend gaps.
     index = pd.DatetimeIndex([
@@ -85,12 +86,13 @@ def main():
                     action()
                 assert len(figures) > before, 'No figure produced'
                 if name == 'price_volume':
+                    trades = next(trace for trace in figures[-1].data
+                                  if trace.name == 'Trades * 1.000')
                     if provider == 'yahoo':
-                        assert not any(trace.type == 'bar' for trace in figures[-1].data)
-                        assert any(a.text == 'Trade counts unavailable' for a in figures[-1].layout.annotations)
+                        assert pd.isna(trades.y).all(), 'Missing counts must remain missing'
                     else:
-                        trades = next(trace for trace in figures[-1].data if trace.name == 'Trades')
-                        np.testing.assert_array_equal(trades.y, info._last_period('48h')['number_of_trades'])
+                        np.testing.assert_array_equal(
+                            trades.y, info._last_period('48h')['number_of_trades'] * 1000)
                 print(f'PASS {provider}: {name} (figure serialized)')
             except Exception as exc:
                 failures.append((provider, name, str(exc)))

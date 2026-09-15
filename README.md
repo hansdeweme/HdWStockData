@@ -1,14 +1,19 @@
 # HdW Stock Data
 
-First draft of `hdw-stock-data` 0.1.0: retrieve stock observations directly
+`hdw-stock-data` 0.1.0: retrieve stock observations directly
 from Yahoo's chart HTTP endpoint, normalize OHLCV, preserve timestamp instants,
 and optionally write an atomic CSV snapshot. It uses `requests`, not yfinance.
 This project is independent of `hdw-crypto-data`.
 
 ## Install
 
-Python 3.11 or newer is required. 
-From the repository root:
+Python 3.11 or newer is required. Install from PyPI:
+
+```powershell
+python -m pip install hdw-stock-data
+```
+
+For development, run from the repository root:
 
 ```powershell
 py -3.13 -m venv .venv
@@ -56,7 +61,7 @@ the package performs no price adjustment; source adjustments are not undone.
 ## Verification
 
 ```powershell
-py -3.13 -m unittest discover -s tests -p test_stock_data.py -v
+py -3.13 -m unittest discover -s tests -v
 py -3.13 -m build
 py -3.13 -m twine check dist/*
 ```
@@ -80,5 +85,5 @@ timezone is `Europe/Amsterdam`; override it with `--timezone UTC`. You can also
 provide a different list of symbols as positional arguments.
 
 See [architecture](docs/architecture.md), [API](docs/api.md), and
-[testing plan](docs/testing.md). No live-provider coverage is claimed by the
+[testing plan](docs/testing.md), and [showcase setup](docs/showcase.md). No live-provider coverage is claimed by the
 offline test suite.

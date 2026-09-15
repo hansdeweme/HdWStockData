@@ -14,9 +14,9 @@ from PyQt6.QtCore import QThread, pyqtSignal, Qt, QSize
 from PyQt6.QtGui import QIcon, QColor
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QListWidgetItem, QTableWidgetItem, QFileDialog, QMessageBox)
 # local imports
-from showcase_ui import build_ui
-from stylesheet import DARK_STYLE
-from showcase_sources import (MarketDataset, StockRequest, CryptoRequest, AcquisitionController, load_csv, SOURCE_PACKAGES, source_availability)
+from .showcase_ui import build_ui
+from .stylesheet import DARK_STYLE
+from .showcase_sources import (MarketDataset, StockRequest, CryptoRequest, AcquisitionController, load_csv, SOURCE_PACKAGES, source_availability)
 
 
 class PipelineWorker(QThread):
@@ -72,7 +72,7 @@ class MiniDumperApp(QMainWindow):
             self.add_dataset(dataset)
 
     def load_settings(self):
-        root = Path(__file__).resolve().parent
+        root = Path(__file__).resolve().parents[1]
         settings = {'spot': str(root / 'spot'), 'quote_currency': 'USDT',
                     'preferred_time_zone': 'UTC'}
         path = root / 'settings.json'
@@ -345,7 +345,7 @@ class MiniDumperApp(QMainWindow):
 
     def build_ta_charts(self, key):
         if key not in self.chart_info_cache:
-            from ta_charts import TACharts
+            from .ta_charts import TACharts
             dataset = self.datasets[key]
             self.chart_info_cache[key] = TACharts(dataset.symbol, dataset.dataframe.copy(deep=True))
         return self.chart_info_cache[key]

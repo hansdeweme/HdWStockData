@@ -1,7 +1,14 @@
 # Shared market showcase
 
-Run from this checkout with `py -3.13 showcase_pyqt_app.py`.
-The GUI needs PyQt6. Charting also needs the dependencies imported by the local
+Run from this checkout with `py -3.13 -m examples.showcase_pyqt_app`.
+Install the optional GUI and chart dependencies with Python 3.12 or newer:
+
+```powershell
+python -m pip install -e ".[dev,showcase]"
+```
+
+The core package supports Python 3.11; the showcase uses pandas_ta, which
+requires Python 3.12 or newer. The GUI needs PyQt6. Charting also needs the dependencies imported by the local
 `ta_charts.py`: numpy, pandas, pandas_ta, plotly, ta, scipy, and progressbar2.
 The crypto package is imported only when a crypto request runs. The local
 `stylesheet.py` supplies the original showcase's dark theme.
@@ -35,14 +42,15 @@ contract. The crypto adapter loads the builder's resulting CSV through the
 crypto package; the Yahoo adapter maps `StockDataResult` and its descriptor.
 Both return a canonical, timezone-aware, sorted OHLCV DataFrame with actual
 bounds and warnings. Missing trade counts remain nullable; they are never
-converted into zero. The price/volume chart labels unavailable trade counts
-and plots supplied counts without rescaling them.
+converted into zero. The price/volume chart displays trade counts multiplied
+by 1,000, labeled `Trades * 1.000`; missing counts remain missing and produce
+no visible trade bars. Stored DataFrames retain the original counts.
 
 Existing data can bypass acquisition entirely:
 
 ```python
-from showcase_sources import MarketDataset
-from showcase_pyqt_app import QApplication, MiniDumperApp
+from examples.showcase_sources import MarketDataset
+from examples.showcase_pyqt_app import QApplication, MiniDumperApp
 
 dataset = MarketDataset.from_dataframe(
     df, symbol="AAPL", interval="1h", provider="Existing"
@@ -67,7 +75,9 @@ assigned an assumed timezone. The filename stem labels imported datasets.
 **Save enhanced CSV** exports the chart's analysis columns and preserves
 timestamp offsets without the timezone restriction of Excel export.
 
-Settings are loaded relative to the application file. `stock_icons` and
+Settings are loaded from `settings.json` in the repository root. Relative paths
+are resolved against that root. Copy `settings.example.json` to `settings.json`
+and customize it for your machine. `stock_icons` and
 `crypto_icons` provide PNG icons and populate the corresponding asset picker
 from filename stems. Missing icons do not prevent startup: suggested assets
 and custom input remain available. `spot` selects the Binance archive directory.
@@ -78,7 +88,7 @@ Offline verification:
 
 ```powershell
 py -3.13 -m unittest discover -s tests -v
-py -3.13 examples/check_showcase_compatibility.py
+py -3.13 -m tests.check_showcase_compatibility
 ```
 
 These checks use mocked acquisition and synthetic observations, including

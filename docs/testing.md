@@ -7,6 +7,12 @@ HTTP parameters and retries, capability boundaries, invalid payloads, OHLCV
 normalization and validation, DST conversion, descriptors, and atomic snapshot
 success and failure. No HTTP requests are made by these tests.
 
+Discovery also runs the showcase contract and adapter tests. GUI tests are
+skipped when PyQt6 is unavailable; crypto adapter checks are skipped when the
+optional crypto package is unavailable. For full GUI and chart verification,
+use Python 3.12 or newer and install `python -m pip install -e ".[dev,showcase]"`,
+then run discovery and `python -m tests.check_showcase_compatibility`.
+
 ## Planned live checks
 
 Run `python -m examples.test_assets` for the initial live check of `AAPL`,

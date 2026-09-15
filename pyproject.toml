@@ -21,6 +21,7 @@ classifiers = [
 
 [project.optional-dependencies]
 dev = ["build", "twine"]
+showcase = ["PyQt6", "pandas_ta>=0.4.71b0", "plotly", "ta", "scipy", "progressbar2"]
 
 [project.urls]
 Homepage = "https://github.com/hansdeweme/HdWStockData"

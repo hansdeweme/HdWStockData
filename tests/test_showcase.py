@@ -9,7 +9,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 import pandas as pd
-from showcase_sources import (MarketDataset, StockSourceAdapter, StockRequest,
+from examples.showcase_sources import (MarketDataset, StockSourceAdapter, StockRequest,
     CryptoSourceAdapter, CryptoRequest, load_csv, source_availability)
 
 
@@ -23,7 +23,7 @@ class ContractTests(unittest.TestCase):
     def test_source_presence_without_importing_pipelines(self):
         for stock, crypto in ((True, True), (True, False), (False, True), (False, False)):
             with self.subTest(stock=stock, crypto=crypto), patch(
-                    'showcase_sources.find_spec', side_effect=[object() if stock else None,
+                    'examples.showcase_sources.find_spec', side_effect=[object() if stock else None,
                                                               object() if crypto else None]) as probe:
                 self.assertEqual(source_availability(), (stock, crypto))
                 self.assertEqual([call.args[0] for call in probe.call_args_list],
@@ -93,7 +93,7 @@ class ContractTests(unittest.TestCase):
 
 class ShowcaseGuiTests(unittest.TestCase):
     def setUp(self):
-        availability = patch('showcase_pyqt_app.source_availability', return_value=(True, True))
+        availability = patch('examples.showcase_pyqt_app.source_availability', return_value=(True, True))
         availability.start()
         self.addCleanup(availability.stop)
 
@@ -101,16 +101,16 @@ class ShowcaseGuiTests(unittest.TestCase):
     def setUpClass(cls):
         os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
         try:
-            from showcase_pyqt_app import QApplication
+            from examples.showcase_pyqt_app import QApplication
         except ImportError as exc:
             raise unittest.SkipTest(str(exc))
         cls.app = QApplication.instance() or QApplication([])
 
     def test_missing_packages_restrict_acquisition_but_allow_existing_data(self):
-        from showcase_pyqt_app import MiniDumperApp
+        from examples.showcase_pyqt_app import MiniDumperApp
         for available in ((True, True), (True, False), (False, True), (False, False)):
             with self.subTest(available=available), patch(
-                    'showcase_pyqt_app.source_availability', return_value=available):
+                    'examples.showcase_pyqt_app.source_availability', return_value=available):
                 window = MiniDumperApp()
                 try:
                     self.assertEqual(window.dependency_notice.isHidden(), all(available))
@@ -123,7 +123,7 @@ class ShowcaseGuiTests(unittest.TestCase):
                         if not available[index]:
                             self.assertIn(package, window.dependency_notice.text())
                             self.assertIn('-m pip install', window.dependency_notice.text())
-                            with patch('showcase_pyqt_app.QMessageBox.warning') as warning:
+                            with patch('examples.showcase_pyqt_app.QMessageBox.warning') as warning:
                                 window.start_processing()
                                 warning.assert_called_once()
                             self.assertIsNone(window.worker)
@@ -135,7 +135,7 @@ class ShowcaseGuiTests(unittest.TestCase):
                     window.close()
 
     def test_direct_dataset_cache_and_source_selection(self):
-        from showcase_pyqt_app import MiniDumperApp
+        from examples.showcase_pyqt_app import MiniDumperApp
         first = MarketDataset.from_dataframe(frame(), symbol='AAPL', provider='Yahoo')
         window = MiniDumperApp([first])
         try:
@@ -143,7 +143,7 @@ class ShowcaseGuiTests(unittest.TestCase):
             self.assertIn('unavailable', window.metadata_label.text())
             window.show()
             self.app.processEvents()
-            with patch('ta_charts.TACharts') as charts:
+            with patch('examples.ta_charts.TACharts') as charts:
                 key = window.chart_asset_combo.currentData()
                 window.build_ta_charts(key)
                 window.build_ta_charts(key)
@@ -162,7 +162,7 @@ class ShowcaseGuiTests(unittest.TestCase):
             window.close()
 
     def test_worker_delivers_dataset_and_continues_after_failure(self):
-        from showcase_pyqt_app import PipelineWorker
+        from examples.showcase_pyqt_app import PipelineWorker
         dataset = MarketDataset.from_dataframe(frame(), symbol='AAPL')
         controller = Mock()
         controller.load.side_effect = [ValueError('failed'), dataset]
@@ -176,7 +176,7 @@ class ShowcaseGuiTests(unittest.TestCase):
 
     def test_icon_picker_filtering_and_source_selections(self):
         from PyQt6.QtGui import QImage, QColor
-        from showcase_pyqt_app import MiniDumperApp
+        from examples.showcase_pyqt_app import MiniDumperApp
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as directory:
             root = Path(directory)
             for kind, symbols in (('stocks', ('AAPL', 'BRK.B')), ('crypto', ('btc', 'eth'))):
@@ -211,7 +211,7 @@ class ShowcaseGuiTests(unittest.TestCase):
 
     def test_selected_assets_run_worker_and_enable_charts(self):
         from PyQt6.QtTest import QTest
-        from showcase_pyqt_app import MiniDumperApp
+        from examples.showcase_pyqt_app import MiniDumperApp
         settings = {'spot': 'spot', 'preferred_time_zone': 'UTC'}
         with patch.object(MiniDumperApp, 'load_settings', return_value=settings):
             window = MiniDumperApp()
@@ -224,7 +224,7 @@ class ShowcaseGuiTests(unittest.TestCase):
                 if request.symbol == 'BRK.B':
                     return dataset
                 raise ValueError('provider unavailable')
-            with patch('showcase_pyqt_app.AcquisitionController') as factory:
+            with patch('examples.showcase_pyqt_app.AcquisitionController') as factory:
                 factory.return_value.load.side_effect = acquire
                 window.start_processing()
                 self.assertFalse(window.asset_group.isEnabled())
@@ -242,7 +242,7 @@ class ShowcaseGuiTests(unittest.TestCase):
             self.assertTrue(window.show_chart_btn.isEnabled())
             self.assertTrue(window.chart_type_combo.isEnabled())
             self.assertTrue(window.asset_group.isEnabled())
-            with patch('ta_charts.TACharts') as charts:
+            with patch('examples.ta_charts.TACharts') as charts:
                 window.chart_type_combo.setCurrentIndex(1)
                 window.show_selected_chart()
                 charts.return_value.plot_pricevol.assert_called_once_with(96)
@@ -251,7 +251,7 @@ class ShowcaseGuiTests(unittest.TestCase):
             window.set_all_checked(False)
             window.symbol_input.setText('ETH')
             window.add_custom_assets()
-            with patch('showcase_pyqt_app.AcquisitionController') as factory:
+            with patch('examples.showcase_pyqt_app.AcquisitionController') as factory:
                 factory.return_value.load.return_value = MarketDataset.from_dataframe(frame(), symbol='ETHUSDT', provider='Binance')
                 window.start_processing()
                 deadline = time.monotonic() + 5

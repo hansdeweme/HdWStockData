@@ -78,12 +78,7 @@ class TACharts:
         fig = make_subplots(specs=[[{"secondary_y": True}]])
         fig.add_trace(go.Scatter(x=D.index, y=D['close'],  name="Price",  mode='lines', line=dict(width=2, color = 'blue')),   secondary_y=False,)
         fig.add_trace(go.Scatter(x=D.index, y=D['volume'], name="Volume", mode='lines', line=dict(width=2, color = 'red')),  secondary_y=True,)
-        trades = D.get('number_of_trades')
-        if trades is not None and trades.notna().any():
-            fig.add_trace(go.Bar(x=D.index, y=trades, name="Trades", opacity=1), secondary_y=True)
-        else:
-            fig.add_annotation(text="Trade counts unavailable", xref="paper", yref="paper",
-                               x=0, y=1.08, showarrow=False)
+        fig.add_trace(go.Bar(x=D.index, y=(D['number_of_trades']*1000), name="Trades * 1.000", opacity=1), secondary_y=True,)
         fig.update_layout(title_text=self.MARKET+" Price - Volume - Trades Zoom for the most recent "+H)
         fig.update_xaxes(title_text="Time")
         fig.update_yaxes(title_text="Price",  secondary_y=False)
@@ -92,37 +87,63 @@ class TACharts:
 
     # KELTNER CHANNEL CALCULATION
     def get_kc(self, high, low, close, kc_lookback, multiplier, atr_lookback):
-        tr1 = pd.DataFrame(high - low)
-        tr2 = pd.DataFrame(abs(high - close.shift()))
-        tr3 = pd.DataFrame(abs(low - close.shift()))
-        frames = [tr1, tr2, tr3]
-        tr = pd.concat(frames, axis = 1, join = 'inner').max(axis = 1)
-        atr = tr.ewm(alpha = 1/atr_lookback).mean()
-        kc_middle = close.ewm(kc_lookback).mean()
-        kc_upper = close.ewm(kc_lookback).mean() + multiplier * atr
-        kc_lower = close.ewm(kc_lookback).mean() - multiplier * atr
-        return kc_middle, kc_upper, kc_lower
+        previous_close = close.shift(1)
+        true_range = pd.concat([high - low, (high - previous_close).abs(), (low - previous_close).abs(),], axis=1,).max(axis=1)
+        atr = true_range.ewm(alpha=1 / atr_lookback, adjust=False, min_periods=atr_lookback,).mean()
+        middle = close.ewm(span=kc_lookback, adjust=False, min_periods=kc_lookback,).mean()
+        upper = middle + multiplier * atr
+        lower = middle - multiplier * atr
+        return middle, upper, lower
 
     def implement_kc_strategy(self, prices, kc_upper, kc_lower):
-        prices = pd.Series(prices)
-        kc_upper = pd.Series(kc_upper, index=prices.index)
-        kc_lower = pd.Series(kc_lower, index=prices.index)
-        buy_price = pd.Series(np.nan, index=prices.index, dtype="float64")
-        sell_price = pd.Series(np.nan, index=prices.index, dtype="float64")
-        kc_signal = pd.Series(0, index=prices.index, dtype="int64")
-        signal = 0    
-        for i in range(len(prices)-1):
-            signal_index = prices.index[i + 1]
-            if prices.iloc[i] < kc_lower.iloc[i] and prices.iloc[i + 1] > prices.iloc[i]:
-                if signal != 1:
-                    buy_price.loc[signal_index] = prices.iloc[i + 1]
-                    signal = 1
-                    kc_signal.loc[signal_index] = signal
-            elif prices.iloc[i] > kc_upper.iloc[i] and prices.iloc[i + 1] < prices.iloc[i]:
-                if signal != -1:
-                    sell_price.loc[signal_index] = prices.iloc[i + 1]
-                    signal = -1
-                    kc_signal.loc[signal_index] = signal
+        """Generate causal Keltner mean-reversion entry and exit signals.
+        Entry:
+            Previous close was below the previous lower channel and the current
+            close has returned to or above the current lower channel.
+        Exit:
+            Previous close was above the previous upper channel and the current
+            close has returned to or below the current upper channel.
+        Signals are known only after the current candle closes. Marker prices are
+        confirmation prices, not guaranteed executable trade prices.
+        """
+        prices = pd.Series(prices, copy=False).astype("float64")
+        kc_upper = pd.Series(kc_upper, copy=False).reindex(prices.index)
+        kc_lower = pd.Series(kc_lower, copy=False).reindex(prices.index)
+        if not prices.index.is_unique:
+            raise ValueError("prices index must be unique")
+        if not prices.index.is_monotonic_increasing:
+            raise ValueError("prices index must be chronologically sorted")
+
+        buy_price = pd.Series(np.nan, index=prices.index, dtype="float64", name="kc_buy_price", )
+        sell_price = pd.Series(np.nan, index=prices.index, dtype="float64", name="kc_sell_price",)
+        kc_signal = pd.Series(0, index=prices.index, dtype="int8", name="kc_signal",)
+        previous_price = prices.shift(1)
+        previous_upper = kc_upper.shift(1)
+        previous_lower = kc_lower.shift(1)
+        # Price was outside the channel and has now returned inside it.
+        buy_condition = ((previous_price < previous_lower) & (prices >= kc_lower))
+        sell_condition = ((previous_price > previous_upper) & (prices <= kc_upper))
+        # Long-only position state:
+        # 0 = no position
+        # 1 = long position
+        position = 0
+        for timestamp in prices.index:
+            price = prices.loc[timestamp]
+            # Warm-up observations and incomplete data cannot produce signals.
+            if (
+                pd.isna(price)
+                or pd.isna(kc_upper.loc[timestamp])
+                or pd.isna(kc_lower.loc[timestamp])
+            ):
+                continue
+            if position == 0 and bool(buy_condition.loc[timestamp]):
+                buy_price.loc[timestamp] = price
+                kc_signal.loc[timestamp] = 1
+                position = 1
+            elif position == 1 and bool(sell_condition.loc[timestamp]):
+                sell_price.loc[timestamp] = price
+                kc_signal.loc[timestamp] = -1
+                position = 0
         return buy_price, sell_price, kc_signal
 
     def do_keltner(self):
@@ -414,7 +435,7 @@ class TACharts:
         fig.add_trace(go.Scatter(x=data.index, y=filtered_close_series2, mode='lines', name='Filtered close (Std: 1, Poles: 5)', line=dict(color='purple', width=2)))
         pio.show(fig)
         
-    def plot_gaussian_bands_plus_pivots(self, data, mrkt):
+    def plot_gaussian_historical_turning_points(self, data, mrkt):
         filtered_close = self.std_filtered_gaussian(data['close'], sigma=1, n_poles=1)
         filtered_high  = self.std_filtered_gaussian(data['high'], sigma=1, n_poles=1)
         filtered_low   = self.std_filtered_gaussian(data['low'], sigma=1, n_poles=1)
@@ -424,7 +445,7 @@ class TACharts:
         # Calculate the slope of the filtered data
         filtered_close = self.std_filtered_gaussian(data['close'], sigma=1, n_poles=1)
         slope = convolve1d(filtered_close, [1, 0, -1])
-        # Find peaks and valleys
+        # Identify retrospective turning points in a symmetrically smoothed series
         peak_indices   = np.where((slope[:-1] > 0) & (slope[1:] < 0))[0]
         valley_indices = np.where((slope[:-1] < 0) & (slope[1:] > 0))[0]
         fig = go.Figure()
@@ -432,16 +453,18 @@ class TACharts:
         fig.add_trace(go.Scatter(x=data.index, y=band_low, mode='lines', name='High Band - Resistance', line=dict(color='red', width=1, dash='dash')))
         fig.add_trace(go.Scatter(x=data.index, y=band_high, mode='lines', name='Low Band - Support', line=dict(color='green', width=1, dash='dash')))
         fig.add_trace(go.Scatter(x=data.index, y=filtered_close, mode='lines', name='Filtred Price (Std: 1, Poles: 1)', line=dict(color='gray', width=2)))
-        fig.add_trace(go.Scatter(x=data.index[peak_indices], y=filtered_close[peak_indices+1], marker_symbol="star-triangle-down",   marker=dict(size=10, color='red'), line=dict(color='black', width=1), mode='markers', name='Piek - VerBuy'))
-        fig.add_trace(go.Scatter(x=data.index[valley_indices], y=filtered_close[valley_indices], marker_symbol="star-triangle-up",  marker=dict(size=10, color='#90EE90'), line=dict(color='black', width=1), mode='markers', name='Dal - Buy'))
+        fig.add_trace(go.Scatter(x=data.index[peak_indices+1], y=filtered_close[peak_indices+1], marker_symbol="star-triangle-down",   marker=dict(size=10, color='red'), line=dict(color='black', width=1), mode='markers', name='Retrospective Peak'))
+        fig.add_trace(go.Scatter(x=data.index[valley_indices+1], y=filtered_close[valley_indices], marker_symbol="star-triangle-up",  marker=dict(size=10, color='#90EE90'), line=dict(color='black', width=1), mode='markers', name='Retrospective Trough'))
+        fig.add_annotation(text=("Retrospective analysis: Gaussian smoothing uses observations before and after each point. Markers are not real-time signals."),
+            xref="paper", yref="paper", x=0.5, y=1.08, showarrow=False, font=dict(size=11, color="gray"),)        
         fig.update_layout(xaxis_rangeslider_visible=True)
-        fig.update_layout(title='Gaussian Bands with Peak & Valley Trading Signals')
+        fig.update_layout(title='Gaussian-Smoothed Historical Turning Points')
         pio.show(fig)
 
     def do_gauss(self, i):
         Days = str(i)+'D'
         D = self._last_period(Days)     
-        self.plot_gaussian_bands_plus_pivots(D, self.MARKET)
+        self.plot_gaussian_historical_turning_points(D, self.MARKET)
         # plot_gaussian_ema(D)       # Plot Gaussian Filter  + EMA
         # plot_gaussian_trends(D)    # Plot Gaussian trends
         # plot_gaussian_poles(D)     # Plot Gaussian Filter  + EMA

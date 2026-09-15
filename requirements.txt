@@ -1,3 +1,2 @@
-numpy==2.5.3
-pandas==3.0.5
-Requests==2.34.2
+# Install runtime dependencies from the canonical project metadata.
+-e .
