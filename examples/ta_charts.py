@@ -9,6 +9,9 @@
 import pandas as pd
 import numpy as np
 import os
+from pathlib import Path
+import tempfile
+import webbrowser
 import pandas_ta as pta
 import plotly.graph_objs as go
 import plotly.io as pio
@@ -23,6 +26,17 @@ from   progressbar           import ProgressBar, Percentage, GranularBar, ETA
 # data     - pandas dataframe that holds the assets price data  
 
 class TACharts:
+    @staticmethod
+    def _show_chart(fig):
+        """Open a standalone chart without waiting for a browser HTTP request."""
+        with tempfile.NamedTemporaryFile(prefix='showcase-chart-', suffix='.html', delete=False) as output:
+            path = Path(output.name)
+        pio.write_html(fig, file=str(path), include_plotlyjs=True, auto_open=False)
+        print(f"[Info] Chart saved: {path}", flush=True)
+        if not webbrowser.open(path.as_uri(), new=2):
+            raise RuntimeError(f"Could not open the browser. Open the saved chart manually: {path}")
+        print("[Info] Chart handed to browser.", flush=True)
+
     def __init__(self, asset, data):
         self.df  = pd.DataFrame(data)
         if self.df.empty:
@@ -70,7 +84,7 @@ class TACharts:
         fig.add_trace(go.Scatter(x=D.index, y=D['roc'],     name="RoC",   mode='lines', line=dict(width=2, color = 'red')),   secondary_y=True,)                        
         fig.update_layout(title=self.MARKET+' Price Info candlesticks total Dataset plus RSI and SO with RoC')
         fig.update_layout(xaxis_rangeslider_visible=True)
-        pio.show(fig)
+        self._show_chart(fig)
 
     def plot_pricevol(self, hrs):
         H = str(hrs)+'H' 
@@ -83,7 +97,7 @@ class TACharts:
         fig.update_xaxes(title_text="Time")
         fig.update_yaxes(title_text="Price",  secondary_y=False)
         fig.update_yaxes(title_text="Volume", secondary_y=True)
-        pio.show(fig)
+        self._show_chart(fig)
 
     # KELTNER CHANNEL CALCULATION
     def get_kc(self, high, low, close, kc_lookback, multiplier, atr_lookback):
@@ -169,7 +183,7 @@ class TACharts:
         # Updating the layout
         fig.update_layout(title='Keltner Channel 20 Trading Signals', legend=dict(x=1.02, y=0.8))
         fig.update_layout(xaxis_rangeslider_visible=True)
-        pio.show(fig)
+        self._show_chart(fig)
 
     # MOVING AVARAGES + EXPONENTIALLY WEIGHTED MOVING AVARAGE
     def calc_sma_ema(self):
@@ -224,7 +238,7 @@ class TACharts:
         fig.update_layout(xaxis_rangeslider_visible=True)
         fig.update_xaxes(title_font_color='blue')
         fig.update_xaxes(title_font_size=15)
-        pio.show(fig)
+        self._show_chart(fig)
 
     # Calculate Technical Indicators
     def calculate_tis(self, data):
@@ -339,7 +353,7 @@ class TACharts:
         fig.add_trace(go.Scatter(x=data.index, y=exit_prices, marker_symbol="star-triangle-down", marker=dict(size=10, color='red'), line=dict(color='black', width=1), mode='markers',name='Sell'))   
         fig.update_layout(title={'text':f"{symbol} with Bollinger Bands", 'x':0.5})
         fig.update_layout(xaxis_rangeslider_visible=True)
-        pio.show(fig) 
+        self._show_chart(fig)
     
     def get_last_signals(self, D, entry_prices, exit_prices):
         sma7  = D['7_hrs_MA'].to_numpy()
@@ -395,11 +409,18 @@ class TACharts:
     def do_sim(self, i):
         Days = str(i)+'D'
         D = self._last_period(Days)    
+        print(f"[Info] Calculating Bollinger / RSI / STC for {len(D):,} rows ({Days}).", flush=True)
+        if D.empty:
+            raise ValueError('No observations in the selected chart period.')
         D = self.calculate_tis(D)
+        print("[Info] Calculating trading signals.", flush=True)
         D = self.calculate_signals(D)
+        print("[Info] Evaluating strategy.", flush=True)
         entry_prices, exit_prices = self.execute_strategy(D)
+        print("[Info] Building Bollinger / RSI / STC chart.", flush=True)
         self.plot_graph(self.MARKET, D, entry_prices, exit_prices)
         self.get_last_signals(D, entry_prices, exit_prices)
+        print("[Info] Bollinger / RSI / STC chart complete.", flush=True)
 
     # GAUSSIAN FILTERS, Bands compare to Bollinger bands and Keltner channels and bands
     def std_filtered_gaussian(self, data, sigma, n_poles=1):
@@ -415,7 +436,7 @@ class TACharts:
         fig.add_trace(go.Scatter(x=data.index, y=data['close'], mode='lines', name='Price', line=dict(color='blue', width=0.5)))
         fig.add_trace(go.Scatter(x=data.index, y=filtered_close_series, mode='lines', name='Gefilterde Price (Std: 1, Poles: 1)', line=dict(color='green', width=0.5)))
         fig.add_trace(go.Scatter(x=data.index, y=ema1_series, mode='lines', name='EMA (3)', line=dict(color='orange', width=0.5)))
-        pio.show(fig)
+        self._show_chart(fig)
         
     def plot_gaussian_trends(self, data):
         filtered_close_series1 = self.std_filtered_gaussian(data['close'], sigma=5, n_poles=1)
@@ -424,7 +445,7 @@ class TACharts:
         fig.add_trace(go.Scatter(x=data.index, y=data['close'], mode='lines', name='Price', line=dict(color='blue', width=0.5)))
         fig.add_trace(go.Scatter(x=data.index, y=filtered_close_series1, mode='lines', name='Filtered close (Std: 10, Poles: 1)', line=dict(color='green', width=0.5)))
         fig.add_trace(go.Scatter(x=data.index, y=filtered_close_series2, mode='lines', name='Filtered close (Std: 20, Poles: 1)', line=dict(color='purple', width=0.5)))
-        pio.show(fig)
+        self._show_chart(fig)
 
     def plot_gaussian_poles(self, data):
         filtered_close_series1 = self.std_filtered_gaussian(data['close'], sigma=1, n_poles=1)
@@ -433,7 +454,7 @@ class TACharts:
         fig.add_trace(go.Scatter(x=data.index, y=data['close'], mode='lines', name='Price', line=dict(color='blue', width=2)))
         fig.add_trace(go.Scatter(x=data.index, y=filtered_close_series1, mode='lines', name='Filtered close (Std: 1, Poles: 1)', line=dict(color='green', width=2)))
         fig.add_trace(go.Scatter(x=data.index, y=filtered_close_series2, mode='lines', name='Filtered close (Std: 1, Poles: 5)', line=dict(color='purple', width=2)))
-        pio.show(fig)
+        self._show_chart(fig)
         
     def plot_gaussian_historical_turning_points(self, data, mrkt):
         filtered_close = self.std_filtered_gaussian(data['close'], sigma=1, n_poles=1)
@@ -459,7 +480,7 @@ class TACharts:
             xref="paper", yref="paper", x=0.5, y=1.08, showarrow=False, font=dict(size=11, color="gray"),)        
         fig.update_layout(xaxis_rangeslider_visible=True)
         fig.update_layout(title='Gaussian-Smoothed Historical Turning Points')
-        pio.show(fig)
+        self._show_chart(fig)
 
     def do_gauss(self, i):
         Days = str(i)+'D'

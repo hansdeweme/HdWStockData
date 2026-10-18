@@ -73,15 +73,18 @@ class MiniDumperApp(QMainWindow):
 
     def load_settings(self):
         root = Path(__file__).resolve().parents[1]
-        settings = {'spot': str(root / 'spot'), 'quote_currency': 'USDT',
-                    'preferred_time_zone': 'UTC'}
-        path = root / 'settings.json'
+        settings = {'spot': '.', 'full_spot': './spot',
+                    'stock_icons': 'examples/stock_icons',
+                    'crypto_icons': 'examples/crypto_icons',
+                    'quote_currency': 'USDT',
+                    'preferred_time_zone': 'Europe/Amsterdam'}
+        path = root / 'examples' / 'settings.json'
         if path.exists():
             settings.update(json.loads(path.read_text(encoding='utf-8')))
-        for key in ('spot', 'stock_icons', 'crypto_icons'):
+        for key in ('spot', 'full_spot', 'stock_icons', 'crypto_icons'):
             if settings.get(key):
                 value = Path(settings[key]).expanduser()
-                settings[key] = str(value if value.is_absolute() else root / value)
+                settings[key] = str(value if value.is_absolute() else (root / value).resolve())
         return settings
 
     def init_ui(self):

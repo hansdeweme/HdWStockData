@@ -134,6 +134,23 @@ class ShowcaseGuiTests(unittest.TestCase):
                 finally:
                     window.close()
 
+    def test_portable_settings_and_defaults_ignore_working_directory(self):
+        from examples.showcase_pyqt_app import MiniDumperApp
+        root = Path(__file__).resolve().parents[1]
+        for use_defaults in (False, True):
+            with self.subTest(defaults=use_defaults), patch(
+                    'examples.showcase_pyqt_app.Path.cwd', return_value=root.parent):
+                if use_defaults:
+                    with patch('examples.showcase_pyqt_app.Path.exists', return_value=False):
+                        settings = MiniDumperApp.load_settings(None)
+                else:
+                    settings = MiniDumperApp.load_settings(None)
+                for key, relative in (('spot', '.'), ('full_spot', 'spot'),
+                                      ('stock_icons', 'examples/stock_icons'),
+                                      ('crypto_icons', 'examples/crypto_icons')):
+                    self.assertEqual(Path(settings[key]), (root / relative).resolve())
+                self.assertEqual(settings['preferred_time_zone'], 'Europe/Amsterdam')
+
     def test_direct_dataset_cache_and_source_selection(self):
         from examples.showcase_pyqt_app import MiniDumperApp
         first = MarketDataset.from_dataframe(frame(), symbol='AAPL', provider='Yahoo')

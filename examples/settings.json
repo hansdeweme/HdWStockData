@@ -1,0 +1,8 @@
+{
+  "spot": ".",
+  "full_spot": "./spot",
+  "stock_icons": "examples/stock_icons",
+  "crypto_icons": "examples/crypto_icons",
+  "quote_currency": "USDT",
+  "preferred_time_zone": "Europe/Amsterdam"
+}

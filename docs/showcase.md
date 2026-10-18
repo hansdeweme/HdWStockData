@@ -75,13 +75,15 @@ assigned an assumed timezone. The filename stem labels imported datasets.
 **Save enhanced CSV** exports the chart's analysis columns and preserves
 timestamp offsets without the timezone restriction of Excel export.
 
-Settings are loaded from `settings.json` in the repository root. Relative paths
-are resolved against that root. Copy `settings.example.json` to `settings.json`
-and customize it for your machine. `stock_icons` and
-`crypto_icons` provide PNG icons and populate the corresponding asset picker
-from filename stems. Missing icons do not prevent startup: suggested assets
-and custom input remain available. `spot` selects the Binance archive directory.
-`preferred_time_zone` supplies the initial timezone. The previous
+Settings are loaded from `examples/settings.json`. Relative paths are resolved
+against the repository root, independently of the working directory. Both icon
+folders default to `examples/stock_icons` and `examples/crypto_icons`; PNG filename
+stems populate the corresponding asset picker. Either folder may be absent:
+suggested assets and custom input remain available.
+
+The shipped settings contain portable relative paths. `spot` selects the Binance
+download base directory and `full_spot` selects the archive tree used by the builder
+and loader. `preferred_time_zone` supplies the initial timezone. The previous
 `open_candle` setting is not a shared adapter option.
 
 Offline verification:
